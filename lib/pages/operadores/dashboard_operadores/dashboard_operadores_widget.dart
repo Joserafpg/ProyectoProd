@@ -375,7 +375,6 @@ class _DashboardOperadoresWidgetState extends State<DashboardOperadoresWidget> {
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                Text('Estado: ${asignacion['estado']}'),
                 Text(
                     'Fecha de Asignación: ${DateFormat('dd/MM/yyyy HH:mm').format(asignacion['fechaAsignacion'].toDate())}'),
                 const Text('Materiales:'),
@@ -405,20 +404,54 @@ class _DashboardOperadoresWidgetState extends State<DashboardOperadoresWidget> {
 
   void _marcarComoRecibido(BuildContext context, String asignacionId) async {
     try {
-      await FirebaseFirestore.instance
+      print(
+          'Iniciando proceso de marcar como recibido para asignación: $asignacionId');
+
+      // Obtener la referencia a la asignación
+      DocumentReference asignacionRef = FirebaseFirestore.instance
           .collection('asignaciones')
-          .doc(asignacionId)
-          .update({
+          .doc(asignacionId);
+
+      print('Obteniendo datos de la asignación...');
+      // Obtener los datos de la asignación
+      DocumentSnapshot asignacionSnapshot = await asignacionRef.get();
+      if (!asignacionSnapshot.exists) {
+        throw Exception('La asignación no existe');
+      }
+      Map<String, dynamic> asignacionData =
+          asignacionSnapshot.data() as Map<String, dynamic>;
+      print('Datos de la asignación obtenidos: $asignacionData');
+
+      print('Actualizando estado de la asignación a "entregado"...');
+      // Actualizar el estado de la asignación a 'entregado'
+      await asignacionRef.update({
         'estado': 'entregado',
       });
+      print('Estado de la asignación actualizado');
+
+      print('Guardando datos en InventarioEmpleados...');
+      // Copiar todos los datos a InventarioEmpleados, excepto el estado
+      Map<String, dynamic> inventarioData = Map.from(asignacionData);
+      inventarioData.remove('estado'); // Eliminar el estado
+      inventarioData['fechaRecepcion'] = FieldValue.serverTimestamp();
+      inventarioData['asignacionOriginalId'] = asignacionId;
+
+      DocumentReference nuevoInventarioRef = await FirebaseFirestore.instance
+          .collection('InventarioEmpleados')
+          .add(inventarioData);
+      print(
+          'Datos guardados en InventarioEmpleados con ID: ${nuevoInventarioRef.id}');
+
       Navigator.of(context).pop(); // Cierra el diálogo de detalles
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Asignación marcada como recibida')),
+        const SnackBar(
+            content: Text(
+                'Asignación marcada como recibida y guardada en inventario')),
       );
     } catch (e) {
-      print('Error al marcar como recibido: $e');
+      print('Error al marcar como recibido y guardar en inventario: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al marcar como recibido')),
+        SnackBar(content: Text('Error al procesar la asignación: $e')),
       );
     }
   }

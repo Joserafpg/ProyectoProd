@@ -264,7 +264,7 @@ class _MaterialesWidgetState extends State<MaterialesWidget> {
 
                       return StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
-                            .collection('asignaciones')
+                            .collection('InventarioEmpleados')
                             .where('operadorId', isEqualTo: operadorUid)
                             .snapshots(),
                         builder: (context, snapshot) {
@@ -292,11 +292,10 @@ class _MaterialesWidgetState extends State<MaterialesWidget> {
                           for (var doc in snapshot.data!.docs) {
                             List<dynamic> materialesArray = doc['materiales'];
                             Timestamp fechaAsignacion = doc['fechaAsignacion'];
-                            String estado = doc['estado'];
 
                             for (var material in materialesArray) {
                               String key =
-                                  '${material['materialNombre']}_${material['unidad']}_$estado';
+                                  '${material['materialNombre']}_${material['unidad']}';
                               if (materialesAgrupados.containsKey(key)) {
                                 materialesAgrupados[key]!['cantidad'] +=
                                     material['cantidad'];
@@ -306,12 +305,10 @@ class _MaterialesWidgetState extends State<MaterialesWidget> {
                                   'materialNombre': material['materialNombre'],
                                   'unidad': material['unidad'],
                                   'fechaAsignacion': fechaAsignacion,
-                                  'estado': estado,
                                 };
                               }
                             }
                           }
-
                           List<Map<String, dynamic>> materiales =
                               materialesAgrupados.values.toList();
 
@@ -365,21 +362,6 @@ class _MaterialesWidgetState extends State<MaterialesWidget> {
                                   ),
                                 ),
                               ),
-                              DataColumn2(
-                                label: DefaultTextStyle.merge(
-                                  softWrap: true,
-                                  child: Text(
-                                    'Estado',
-                                    style: FlutterFlowTheme.of(context)
-                                        .labelLarge
-                                        .override(
-                                          fontFamily: 'Inter',
-                                          color: Colors.white,
-                                          letterSpacing: 0.0,
-                                        ),
-                                  ),
-                                ),
-                              ),
                             ],
                             dataRowBuilder:
                                 (item, index, selected, onSelectChanged) =>
@@ -403,7 +385,6 @@ class _MaterialesWidgetState extends State<MaterialesWidget> {
                                 DataCell(Text(item['materialNombre'])),
                                 DataCell(Text(item['cantidad'].toString())),
                                 DataCell(Text(item['unidad'])),
-                                DataCell(Text(item['estado'])),
                               ],
                             ),
                             paginated: true,
