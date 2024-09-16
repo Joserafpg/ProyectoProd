@@ -177,32 +177,91 @@ class _AsignarWidgetState extends State<AsignarWidget> {
     }
 
     try {
-      DocumentReference asignacionRef =
-          FirebaseFirestore.instance.collection('asignaciones').doc();
+      // Iniciar una transacción de Firestore
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // Crear una nueva asignación
+        DocumentReference asignacionRef =
+            FirebaseFirestore.instance.collection('asignaciones').doc();
 
-      Map<String, dynamic> asignacionData = {
-        'operadorId': operadorSeleccionado!['uid'] ?? '',
-        'operadorNombre': operadorSeleccionado!['nombre'] ?? '',
-        'fechaAsignacion': FieldValue.serverTimestamp(),
-        'materiales': materialesNotifier.value
-            .map((material) => {
-                  'materialNombre': material['material'] ?? '',
-                  'cantidad': material['cantidad'] as int? ?? 0,
-                  'unidad': material['unidad'] ?? '',
-                })
-            .toList(),
-        'estado': 'pendiente'
-      };
+        Map<String, dynamic> asignacionData = {
+          'operadorId': operadorSeleccionado!['uid'] ?? '',
+          'operadorNombre': operadorSeleccionado!['nombre'] ?? '',
+          'fechaAsignacion': FieldValue.serverTimestamp(),
+          'materiales': materialesNotifier.value
+              .map((material) => {
+                    'materialNombre': material['material'] ?? '',
+                    'cantidad': material['cantidad'] as int? ?? 0,
+                    'unidad': material['unidad'] ?? '',
+                  })
+              .toList(),
+          'estado': 'pendiente'
+        };
 
-      await asignacionRef.set(asignacionData);
+        transaction.set(asignacionRef, asignacionData);
 
-      for (var material in materialesNotifier.value) {
-        String materialNombre = material['material'] as String? ?? '';
-        int cantidad = material['cantidad'] as int? ?? 0;
-        if (materialNombre.isNotEmpty && cantidad > 0) {
-          await actualizarInventario(materialNombre, cantidad);
+        // Crear un nuevo documento en la colección 'movimientos'
+        DocumentReference movimientoRef =
+            FirebaseFirestore.instance.collection('movimientos').doc();
+
+        Map<String, dynamic> movimientoData = {
+          'tipoMovimiento': 'Asignación',
+          'fechaMovimiento': FieldValue.serverTimestamp(),
+          'operadorId': operadorSeleccionado!['uid'] ?? '',
+          'operadorNombre': operadorSeleccionado!['nombre'] ?? '',
+          'materiales': materialesNotifier.value
+              .map((material) => {
+                    'materialNombre': material['material'] ?? '',
+                    'cantidad': material['cantidad'] as int? ?? 0,
+                    'unidad': material['unidad'] ?? '',
+                  })
+              .toList(),
+          'asignacionId': asignacionRef.id,
+          'estado': 'pendiente'
+        };
+
+        transaction.set(movimientoRef, movimientoData);
+
+        // Actualizar el inventario
+        for (var material in materialesNotifier.value) {
+          String materialNombre = material['material'] as String? ?? '';
+          int cantidad = material['cantidad'] as int? ?? 0;
+          if (materialNombre.isNotEmpty && cantidad > 0) {
+            QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+                .collection('Inventario')
+                .where('nombre', isEqualTo: materialNombre)
+                .limit(1)
+                .get();
+
+            if (querySnapshot.docs.isNotEmpty) {
+              DocumentReference docRef = querySnapshot.docs.first.reference;
+              try {
+                DocumentSnapshot snapshot = await transaction.get(docRef);
+                if (!snapshot.exists) {
+                  throw Exception(
+                      "El documento del inventario no existe para $materialNombre");
+                }
+                int cantidadActual =
+                    snapshot['cantidadDisponible'] as int? ?? 0;
+                int nuevaCantidad = cantidadActual - cantidad;
+                if (nuevaCantidad < 0) {
+                  throw Exception(
+                      "No hay suficiente cantidad disponible para $materialNombre");
+                }
+                transaction
+                    .update(docRef, {'cantidadDisponible': nuevaCantidad});
+              } catch (e) {
+                print('Error al procesar el material $materialNombre: $e');
+                throw e; // Re-lanzar la excepción para que la transacción falle
+              }
+            } else {
+              throw Exception(
+                  "Material $materialNombre no encontrado en el inventario");
+            }
+          }
         }
-      }
+      },
+          timeout: const Duration(
+              seconds: 30)); // Aumentar el tiempo de espera de la transacción
 
       setState(() {
         operadorSeleccionado = null;
@@ -211,13 +270,16 @@ class _AsignarWidgetState extends State<AsignarWidget> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Asignación guardada con éxito')),
+        const SnackBar(
+            content:
+                Text('Asignación guardada y movimiento registrado con éxito')),
       );
     } catch (e) {
-      print('Error al guardar la asignación: $e');
+      print('Error al guardar la asignación y registrar el movimiento: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('Error al guardar la asignación: ${e.toString()}')),
+            content: Text(
+                'Error al guardar la asignación y registrar el movimiento: ${e.toString()}')),
       );
     }
   }
