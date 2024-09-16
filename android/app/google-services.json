@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "581824486717",
+    "project_id": "prod-audit-7gehwd",
+    "storage_bucket": "prod-audit-7gehwd.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:581824486717:android:f1cc6d26e4c296a8903954",
+        "android_client_info": {
+          "package_name": "com.mycompany.prodaudit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMeFrhlSTW482fQNU7LiF8R9pCI9e6VaA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
