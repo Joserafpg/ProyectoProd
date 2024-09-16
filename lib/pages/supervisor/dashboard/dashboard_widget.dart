@@ -471,6 +471,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     );
   }
 
+  // ... existing code ...
   void _marcarComoEntregado(
       BuildContext context, DocumentSnapshot solicitud) async {
     try {
@@ -517,7 +518,10 @@ class _DashboardWidgetState extends State<DashboardWidget> {
 
         transaction.set(asignacionRef, asignacionData);
 
-        // Actualizar el inventario para cada material
+        // Preparar los datos para el documento de movimientos
+        List<Map<String, dynamic>> materialesMovimiento = [];
+
+        // Actualizar el inventario y preparar datos para movimientos
         for (int i = 0; i < inventarioDocs.length; i++) {
           var docRef = inventarioDocs[i].reference;
           var material = (solicitud['materiales'] as List<dynamic>)[i];
@@ -533,7 +537,31 @@ class _DashboardWidgetState extends State<DashboardWidget> {
           }
 
           transaction.update(docRef, {'cantidadDisponible': nuevaCantidad});
+
+          materialesMovimiento.add({
+            'materialNombre': material['material'],
+            'cantidad': cantidad,
+            'unidad': material['unidad'] ?? '',
+            'cantidadAnterior': cantidadActual,
+            'cantidadNueva': nuevaCantidad,
+          });
         }
+
+        // Crear un nuevo documento en la colección 'movimientos'
+        DocumentReference movimientoRef =
+            FirebaseFirestore.instance.collection('movimientos').doc();
+
+        Map<String, dynamic> movimientoData = {
+          'tipoMovimiento': 'Aceptación de Solicitud Pendiente',
+          'fechaMovimiento': FieldValue.serverTimestamp(),
+          'materiales': materialesMovimiento,
+          'operadorId': solicitud['empleado_uid'],
+          'operadorNombre': solicitud['empleado_nombre'],
+          'solicitudId': solicitud.id,
+          'asignacionId': asignacionRef.id,
+        };
+
+        transaction.set(movimientoRef, movimientoData);
       });
 
       Navigator.of(context).pop(); // Cierra el diálogo de detalles
@@ -542,14 +570,14 @@ class _DashboardWidgetState extends State<DashboardWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text(
-                'Solicitud marcada como entregada, guardada en asignaciones e inventario actualizado')),
+                'Solicitud aceptada y entregada, guardada en asignaciones, inventario actualizado y movimiento registrado')),
       );
     } catch (e) {
-      print('Error al marcar como entregado y actualizar inventario: $e');
+      print('Error al aceptar la solicitud y actualizar inventario: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                'Error al marcar como entregado y actualizar inventario: ${e.toString()}')),
+                'Error al aceptar la solicitud y actualizar inventario: ${e.toString()}')),
       );
     }
   }
