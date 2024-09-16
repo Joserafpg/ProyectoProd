@@ -151,7 +151,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: 'MaterialesDevolver',
           path: '/materialesDevolver',
-          builder: (context, params) => const MaterialesDevolverWidget(),
+          builder: (context, params) => MaterialesDevolverWidget(
+            materialNombre: params.getParam('materialNombre', ParamType.String),
+            cantidad: params.getParam<int>('cantidad', ParamType.int) ?? 0,
+            unidad: params.getParam('unidad', ParamType.String),
+          ),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

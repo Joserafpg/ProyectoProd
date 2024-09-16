@@ -18,6 +18,7 @@ class MaterialesWidget extends StatefulWidget {
 
 class _MaterialesWidgetState extends State<MaterialesWidget> {
   late MaterialesModel _model;
+  Map<String, dynamic>? selectedMaterial;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -173,7 +174,26 @@ class _MaterialesWidgetState extends State<MaterialesWidget> {
                               15.0, 0.0, 0.0, 0.0),
                           child: FFButtonWidget(
                             onPressed: () async {
-                              context.pushNamed('MaterialesDevolver');
+                              if (selectedMaterial != null) {
+                                context.pushNamed(
+                                  'MaterialesDevolver',
+                                  queryParameters: {
+                                    'materialNombre':
+                                        selectedMaterial!['materialNombre']
+                                            as String,
+                                    'cantidad': selectedMaterial!['cantidad']
+                                        .toString(),
+                                    'unidad':
+                                        selectedMaterial!['unidad'] as String,
+                                  },
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text(
+                                          'Por favor, seleccione un material para devolver')),
+                                );
+                              }
                             },
                             text: 'Devolver',
                             options: FFButtonOptions(
@@ -365,7 +385,13 @@ class _MaterialesWidgetState extends State<MaterialesWidget> {
                                 (item, index, selected, onSelectChanged) =>
                                     DataRow(
                               selected: selected,
-                              onSelectChanged: onSelectChanged,
+                              onSelectChanged: (isSelected) {
+                                onSelectChanged?.call(isSelected);
+                                setState(() {
+                                  selectedMaterial =
+                                      isSelected == true ? item : null;
+                                });
+                              },
                               color: WidgetStateProperty.all(
                                 index % 2 == 0
                                     ? FlutterFlowTheme.of(context)

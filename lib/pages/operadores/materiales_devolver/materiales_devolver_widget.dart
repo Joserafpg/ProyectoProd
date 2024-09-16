@@ -11,9 +11,19 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'materiales_devolver_model.dart';
 export 'materiales_devolver_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MaterialesDevolverWidget extends StatefulWidget {
-  const MaterialesDevolverWidget({super.key});
+  const MaterialesDevolverWidget({
+    Key? key,
+    this.materialNombre,
+    this.cantidad,
+    this.unidad,
+  }) : super(key: key);
+
+  final String? materialNombre;
+  final int? cantidad;
+  final String? unidad;
 
   @override
   State<MaterialesDevolverWidget> createState() =>
@@ -22,6 +32,7 @@ class MaterialesDevolverWidget extends StatefulWidget {
 
 class _MaterialesDevolverWidgetState extends State<MaterialesDevolverWidget> {
   late MaterialesDevolverModel _model;
+  int cantidadDevolver = 0;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -36,6 +47,74 @@ class _MaterialesDevolverWidgetState extends State<MaterialesDevolverWidget> {
     _model.dispose();
 
     super.dispose();
+  }
+
+  Future<void> devolverMaterial() async {
+    if (cantidadDevolver <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                'Por favor, seleccione una cantidad válida para devolver')),
+      );
+      return;
+    }
+
+    try {
+      // Buscar el documento del material por su nombre
+      QuerySnapshot querySnapshot;
+      try {
+        querySnapshot = await FirebaseFirestore.instance
+            .collection('Inventario')
+            .where('nombre', isEqualTo: widget.materialNombre)
+            .limit(1)
+            .get();
+      } catch (e) {
+        print('Error al buscar el material: $e');
+        throw Exception('No se pudo buscar el material en el inventario');
+      }
+
+      if (querySnapshot.docs.isEmpty) {
+        throw Exception('El material no existe en el inventario');
+      }
+
+      // Obtener el documento del material
+      DocumentSnapshot materialDoc = querySnapshot.docs.first;
+
+      // Obtener la cantidad actual y calcular la nueva cantidad
+      int cantidadActual;
+      try {
+        cantidadActual = materialDoc.get('cantidadDisponible') as int;
+      } catch (e) {
+        print('Error al obtener la cantidad: $e');
+        throw Exception('El campo cantidad no es válido');
+      }
+      int nuevaCantidad = cantidadActual + cantidadDevolver;
+
+      // Actualizar la cantidad en Firestore
+      try {
+        await materialDoc.reference.update({'cantidad': nuevaCantidad});
+      } catch (e) {
+        print('Error al actualizar el documento: $e');
+        throw Exception('No se pudo actualizar la cantidad en el inventario');
+      }
+
+      // Mostrar mensaje de éxito
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Material devuelto exitosamente')),
+      );
+
+      // Reiniciar la cantidad a devolver
+      setState(() {
+        cantidadDevolver = 0;
+      });
+    } catch (e, stackTrace) {
+      // Mostrar mensaje de error con más detalles
+      print('Error detallado: $e');
+      print('Stack trace: $stackTrace');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al devolver el material: $e')),
+      );
+    }
   }
 
   @override
@@ -475,10 +554,19 @@ class _MaterialesDevolverWidgetState extends State<MaterialesDevolverWidget> {
                                                               FontWeight.w600,
                                                         ),
                                               ),
-                                              const TextSpan(
-                                                text: 'material1',
-                                                style: TextStyle(),
-                                              )
+                                              TextSpan(
+                                                text: widget.materialNombre ??
+                                                    'No especificado',
+                                                style:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .override(
+                                                          fontFamily: 'Inter',
+                                                          letterSpacing: 0.0,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                              ),
                                             ],
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
@@ -493,6 +581,19 @@ class _MaterialesDevolverWidgetState extends State<MaterialesDevolverWidget> {
                                     ],
                                   ),
                                 ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
+                                  0.0, 10.0, 0.0, 0.0),
+                              child: Text(
+                                'Cantidad disponible: ${widget.cantidad ?? 0} ${widget.unidad ?? ''}',
+                                style: FlutterFlowTheme.of(context)
+                                    .bodyMedium
+                                    .override(
+                                      fontFamily: 'Inter',
+                                      letterSpacing: 0.0,
+                                    ),
                               ),
                             ),
                             Row(
@@ -523,53 +624,58 @@ class _MaterialesDevolverWidgetState extends State<MaterialesDevolverWidget> {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.max,
                                     children: [
-                                      Padding(
-                                        padding: const EdgeInsetsDirectional
-                                            .fromSTEB(0.0, 0.0, 20.0, 0.0),
-                                        child: FlutterFlowIconButton(
-                                          borderColor: Colors.transparent,
-                                          borderRadius: 8.0,
-                                          buttonSize: 40.0,
-                                          fillColor: const Color(0xFF25EB88),
-                                          icon: FaIcon(
-                                            FontAwesomeIcons.minus,
-                                            color: FlutterFlowTheme.of(context)
-                                                .info,
-                                            size: 24.0,
-                                          ),
-                                          onPressed: () {
-                                            print('IconButton pressed ...');
-                                          },
+                                      FlutterFlowIconButton(
+                                        borderColor: Colors.transparent,
+                                        borderRadius: 8.0,
+                                        buttonSize: 40.0,
+                                        fillColor: const Color(0xFF25EB88),
+                                        icon: FaIcon(
+                                          FontAwesomeIcons.minus,
+                                          color:
+                                              FlutterFlowTheme.of(context).info,
+                                          size: 24.0,
                                         ),
-                                      ),
-                                      Text(
-                                        '0',
-                                        style: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .override(
-                                              fontFamily: 'Inter',
-                                              letterSpacing: 0.0,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        onPressed: () {
+                                          setState(() {
+                                            if (cantidadDevolver > 0) {
+                                              cantidadDevolver--;
+                                            }
+                                          });
+                                        },
                                       ),
                                       Padding(
                                         padding: const EdgeInsetsDirectional
-                                            .fromSTEB(20.0, 0.0, 0.0, 0.0),
-                                        child: FlutterFlowIconButton(
-                                          borderColor: Colors.transparent,
-                                          borderRadius: 8.0,
-                                          buttonSize: 40.0,
-                                          fillColor: const Color(0xFF25EB88),
-                                          icon: Icon(
-                                            Icons.add,
-                                            color: FlutterFlowTheme.of(context)
-                                                .info,
-                                            size: 24.0,
-                                          ),
-                                          onPressed: () {
-                                            print('IconButton pressed ...');
-                                          },
+                                            .fromSTEB(20.0, 0.0, 20.0, 0.0),
+                                        child: Text(
+                                          cantidadDevolver.toString(),
+                                          style: FlutterFlowTheme.of(context)
+                                              .bodyMedium
+                                              .override(
+                                                fontFamily: 'Inter',
+                                                letterSpacing: 0.0,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                         ),
+                                      ),
+                                      FlutterFlowIconButton(
+                                        borderColor: Colors.transparent,
+                                        borderRadius: 8.0,
+                                        buttonSize: 40.0,
+                                        fillColor: const Color(0xFF25EB88),
+                                        icon: Icon(
+                                          Icons.add,
+                                          color:
+                                              FlutterFlowTheme.of(context).info,
+                                          size: 24.0,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            if (cantidadDevolver <
+                                                (widget.cantidad ?? 0)) {
+                                              cantidadDevolver++;
+                                            }
+                                          });
+                                        },
                                       ),
                                     ],
                                   ),
@@ -655,9 +761,7 @@ class _MaterialesDevolverWidgetState extends State<MaterialesDevolverWidget> {
                                 padding: const EdgeInsetsDirectional.fromSTEB(
                                     0.0, 20.0, 0.0, 20.0),
                                 child: FFButtonWidget(
-                                  onPressed: () {
-                                    print('Button pressed ...');
-                                  },
+                                  onPressed: devolverMaterial,
                                   text: 'Enviar devolucion',
                                   icon: const Icon(
                                     Icons.send_rounded,
